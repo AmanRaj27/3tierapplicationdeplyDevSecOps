@@ -1,0 +1,38 @@
+pipeline {
+    agent any
+    environment {
+        GEMINI_API_KEY = credentials('GEMINI_API_KEY') // Stored in Jenkins Credentials
+    }
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+        
+        stage('Trivy Security Scan') {
+            steps {
+                // Generate machine-readable JSON scan output
+                sh 'trivy image --severity HIGH,CRITICAL --format json -o trivy-report.json app:latest || true'
+            }
+        }
+
+        stage('AI Auto-Remediation Analysis') {
+            steps {
+                // Run the LLM remediation script passing the Trivy report
+                sh 'python3 ai_remediate.py trivy-report.json'
+            }
+        }
+        
+        stage('Build & Deploy') {
+            steps {
+                echo "Proceeding with deployment..."
+            }
+        }
+    }
+    post {
+        always {
+            archiveArtifacts artifacts: 'remediation_report.md, trivy-report.json', allowEmptyArchive: true
+        }
+    }
+}
